@@ -87,7 +87,7 @@ def _send_via_email(patient_data, pdf_path):
             "attachments": [
                 {
                     "filename": "surat_sakit.pdf",
-                    "content": pdf_bytes,
+                    "content": base64.b64encode(pdf_bytes).decode(),
                     "type": "application/pdf"
                 }
             ]
