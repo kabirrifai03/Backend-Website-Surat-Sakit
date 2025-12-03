@@ -8,6 +8,7 @@ from email import encoders
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
+import resend
 
 logger = logging.getLogger(__name__)
 
@@ -59,133 +60,50 @@ def send_letter_to_admin(patient_data: dict, pdf_path: str) -> dict:
     return drive_result if drive_result['success'] else email_result
 
 
-def _send_via_email(patient_data: dict, pdf_path: str) -> dict:
-    """
-    Send email with PDF attachment to admin
-    """
+
+
+def _send_via_email(patient_data, pdf_path):
     try:
-        if not SMTP_EMAIL or not SMTP_PASSWORD:
-            return {
-                'success': False,
-                'method': 'email',
-                'error': 'SMTP credentials not configured'
-            }
-        
-        # Create message
-        msg = MIMEMultipart()
-        msg['From'] = SMTP_EMAIL
-        msg['To'] = ADMIN_EMAIL
-        msg['Subject'] = f"New Medical Letter Request - {patient_data.get('name', 'Unknown')}"
-        
-        # Email body
-        body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-                <h2 style="color: white; margin: 0;">🏥 New Medical Letter Request</h2>
-            </div>
-            
-            <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                <h3 style="color: #1f2937; margin-top: 0;">👤 Patient Information</h3>
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr><td style="padding: 5px 0;"><strong>Name:</strong></td><td>{patient_data.get('name', 'N/A')}</td></tr>
-                    <tr><td style="padding: 5px 0;"><strong>Gender:</strong></td><td>{patient_data.get('gender', 'N/A')}</td></tr>
-                    <tr><td style="padding: 5px 0;"><strong>Age:</strong></td><td>{patient_data.get('age', 'N/A')} years</td></tr>
-                    <tr><td style="padding: 5px 0;"><strong>Occupation:</strong></td><td>{patient_data.get('occupation', 'N/A')}</td></tr>
-                    <tr><td style="padding: 5px 0;"><strong>Address:</strong></td><td>{patient_data.get('address', 'N/A')}</td></tr>
-                </table>
-            </div>
-            
-            <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                <h3 style="color: #92400e; margin-top: 0;">🏥 Medical Information</h3>
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr><td style="padding: 5px 0;"><strong>Duration:</strong></td><td>{patient_data.get('duration', 'N/A')}</td></tr>
-                    <tr><td style="padding: 5px 0;"><strong>From:</strong></td><td>{patient_data.get('from_date', 'N/A')}</td></tr>
-                    <tr><td style="padding: 5px 0;"><strong>To:</strong></td><td>{patient_data.get('to_date', 'N/A')}</td></tr>
-                    <tr><td style="padding: 5px 0;"><strong>Diagnosis:</strong></td><td>{patient_data.get('notes', 'N/A')}</td></tr>
-                </table>
-            </div>
-            
-            <div style="background: #dbeafe; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                <h3 style="color: #1e40af; margin-top: 0;">🏢 Clinic Information</h3>
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr><td style="padding: 5px 0;"><strong>Clinic:</strong></td><td>{patient_data.get('clinic_name', 'N/A')} - {patient_data.get('clinic_type', 'N/A')}</td></tr>
-                    <tr><td style="padding: 5px 0;"><strong>Address:</strong></td><td>{patient_data.get('clinic_address', 'N/A')}</td></tr>
-                    <tr><td style="padding: 5px 0;"><strong>Doctor:</strong></td><td>{patient_data.get('doctor_name', 'N/A')}</td></tr>
-                    <tr><td style="padding: 5px 0;"><strong>Doctor NIP:</strong></td><td>{patient_data.get('doctor_nip', 'N/A')}</td></tr>
-                </table>
-            </div>
-            
-            <div style="background: #fee2e2; padding: 15px; border-radius: 8px; border-left: 4px solid #dc2626;">
-                <h3 style="color: #991b1b; margin-top: 0;">⚠️ Action Required</h3>
-                <ol style="color: #7f1d1d; margin: 0; padding-left: 20px;">
-                    <li>Verify payment has been received</li>
-                    <li>Review the attached medical letter PDF</li>
-                    <li>Contact patient via WhatsApp: <strong>{ADMIN_WHATSAPP}</strong></li>
-                    <li>Send final document to patient</li>
-                </ol>
-            </div>
-            
-            <div style="margin-top: 20px; padding: 15px; background: #f3f4f6; border-radius: 8px; text-align: center;">
-                <p style="margin: 0; color: #6b7280; font-size: 14px;">
-                    📎 <strong>Attachment:</strong> Generated medical letter is attached to this email
-                </p>
-            </div>
-        </body>
-        </html>
+        resend.api_key = os.getenv("RESEND_API_KEY")
+
+        # baca PDF
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+
+        # BODY EMAIL
+        body_html = f"""
+        <p><b>New Medical Letter Request</b></p>
+        <p>Name: {patient_data.get('name')}</p>
+        <p>Diagnosis: {patient_data.get('notes')}</p>
+        <p>Duration: {patient_data.get('duration')}</p>
+        <p>PDF terlampir.</p>
         """
-        
-        msg.attach(MIMEText(body, 'html'))
-        
-        # Attach PDF file
-        if os.path.exists(pdf_path):
-            filename = Path(pdf_path).name
-            with open(pdf_path, 'rb') as attachment:
-                part = MIMEBase('application', 'pdf')
-                part.set_payload(attachment.read())
-            
-            encoders.encode_base64(part)
-            part.add_header(
-                'Content-Disposition',
-                f'attachment; filename="{filename}"',
-            )
-            msg.attach(part)
-        else:
-            logger.error(f"PDF file not found: {pdf_path}")
-            return {
-                'success': False,
-                'method': 'email',
-                'error': 'PDF file not found'
-            }
-        
-        # Send email via SMTP
-        if SMTP_USE_SSL:
-            # Use SSL (port 465)
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=30) as server:
-                server.login(SMTP_EMAIL, SMTP_PASSWORD)
-                server.send_message(msg)
-        else:
-            # Use STARTTLS (port 587)
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
-                server.starttls()
-                server.login(SMTP_EMAIL, SMTP_PASSWORD)
-                server.send_message(msg)
-        
-        logger.info(f"✅ Email sent successfully to {ADMIN_EMAIL}")
-        logger.info(f"Patient: {patient_data.get('name')} - Letter: {patient_data.get('letter_number')}")
-        
+
+        response = resend.Emails.send({
+            "from": "no-reply@suratsakit.app",   # bebas, tapi domain valid = lebih aman
+            "to": os.getenv("ADMIN_EMAIL"),
+            "subject": f"New Medical Letter - {patient_data.get('name')}",
+            "html": body_html,
+            "attachments": [
+                {
+                    "filename": "surat_sakit.pdf",
+                    "content": pdf_bytes,
+                    "type": "application/pdf"
+                }
+            ]
+        })
+
         return {
-            'success': True,
-            'method': 'email',
-            'error': None
+            "success": True,
+            "method": "email",
+            "error": None
         }
-        
+
     except Exception as e:
-        logger.error(f"❌ Email sending failed: {str(e)}")
         return {
-            'success': False,
-            'method': 'email',
-            'error': str(e)
+            "success": False,
+            "method": "email",
+            "error": str(e)
         }
 
 
