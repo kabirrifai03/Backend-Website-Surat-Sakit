@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 import resend
+import base64
 
 logger = logging.getLogger(__name__)
 
