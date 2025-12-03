@@ -81,7 +81,7 @@ def _send_via_email(patient_data, pdf_path):
         """
 
         response = resend.Emails.send({
-            "from": os.getenv("SMTP_EMAIL"),
+            "from": "no-reply@jasasuratsakit.com",
             "to": os.getenv("ADMIN_EMAIL"),
             "subject": f"New Medical Letter - {patient_data.get('name')}",
             "html": body_html,
