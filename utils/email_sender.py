@@ -32,33 +32,48 @@ SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'true').lower() == 'true'
 
 
 def send_letter_to_admin(patient_data: dict, pdf_path: str) -> dict:
-    """
-    Send generated medical letter to admin via email
-    Falls back to Google Drive upload if email fails
-    
-    Args:
-        patient_data: Dictionary containing patient information
-        pdf_path: Path to the generated PDF file
-    
-    Returns:
-        Dict with success status and method used
-    """
-    result = {
-        'success': False,
-        'method': None,
-        'error': None
-    }
-    
-    # Try email first
-    email_result = _send_via_email(patient_data, pdf_path)
-    if email_result['success']:
-        return email_result
-    
-    # If email fails, try Google Drive
-    logger.warning(f"Email sending failed: {email_result['error']}. Trying Google Drive...")
-    drive_result = _upload_to_drive(patient_data, pdf_path)
-    
-    return drive_result if drive_result['success'] else email_result
+    # Try Telegram first (lebih stabil)
+    tg = send_to_telegram(patient_data, pdf_path)
+    if tg["success"]:
+        return tg
+
+    # Coba email (kalau kamu masih mau)
+    email = _send_via_email(patient_data, pdf_path)
+    if email["success"]:
+        return email
+
+    return tg
+
+
+import requests
+
+def send_to_telegram(patient_data, pdf_path):
+    try:
+        token = os.getenv("TELEGRAM_TOKEN")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        url = f"https://api.telegram.org/bot{token}/sendDocument"
+
+        with open(pdf_path, "rb") as file:
+            files = {"document": file}
+            data = {
+                "chat_id": chat_id,
+                "caption": (
+                    f"New Medical Letter Request\n"
+                    f"Name: {patient_data.get('name')}\n"
+                    f"Diagnosis: {patient_data.get('notes')}\n"
+                    f"Duration: {patient_data.get('duration')}"
+                )
+            }
+
+            response = requests.post(url, data=data, files=files)
+        
+        if response.status_code == 200:
+            return {"success": True, "method": "telegram"}
+        else:
+            return {"success": False, "method": "telegram", "error": response.text}
+
+    except Exception as e:
+        return {"success": False, "method": "telegram", "error": str(e)}
 
 
 
