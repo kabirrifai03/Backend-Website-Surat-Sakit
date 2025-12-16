@@ -123,8 +123,16 @@ def render_docx_with_docxtpl(data: dict, logo_path: str = None) -> str:
         # Tentukan template berdasarkan pilihan user
         if paper_size == "A3":
             template_path = TEMPLATES_DIR / "sick_letter_horizontal.docx"
-        else:
+        elif paper_size == "A4":
             template_path = TEMPLATES_DIR / "sick_letter.docx"
+        elif paper_size == "A3Sehat":
+            template_path = TEMPLATES_DIR / "sick_letter_horizontal_sehat.docx"
+        elif paper_size == "A4Sehat":
+            template_path = TEMPLATES_DIR / "sick_letter_sehat.docx"
+        else:
+            # fallback kalau nilainya aneh / tidak dikenal
+            template_path = TEMPLATES_DIR / "sick_letter.docx"
+
 
         # Debug log
         logger.info(f"Using template: {template_path}")
